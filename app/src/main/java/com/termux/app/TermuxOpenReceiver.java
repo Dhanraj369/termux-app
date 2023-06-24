@@ -52,6 +52,7 @@ public class TermuxOpenReceiver extends BroadcastReceiver {
                 break;
             default:
                 Logger.logError(LOG_TAG, "Invalid action '" + intentAction + "', using 'view'");
+                intentAction = Intent.ACTION_VIEW; // Change the intent action to 'view'
                 break;
         }
 
@@ -95,134 +96,9 @@ public class TermuxOpenReceiver extends BroadcastReceiver {
             String fileName = fileToShare.getName();
             int lastDotIndex = fileName.lastIndexOf('.');
             String fileExtension = fileName.substring(lastDotIndex + 1);
-            MimeTypeMap mimeTypes = MimeTypeMap.getSingleton();
-            // Lower casing makes it work with e.g. "JPG":
-            contentTypeToUse = mimeTypes.getMimeTypeFromExtension(fileExtension.toLowerCase());
-            if (contentTypeToUse == null) contentTypeToUse = "application/octet-stream";
-        } else {
-            contentTypeToUse = contentTypeExtra;
-        }
+            MimeTypeMap mimeTypes = MimeTypeMap
 
-        // Do not create Uri with Uri.parse() and use Uri.Builder().path(), check UriUtils.getUriFilePath().
-        Uri uriToShare = UriUtils.getContentUri(TermuxConstants.TERMUX_FILE_SHARE_URI_AUTHORITY, fileToShare.getAbsolutePath());
 
-        if (Intent.ACTION_SEND.equals(intentAction)) {
-            sendIntent.putExtra(Intent.EXTRA_STREAM, uriToShare);
-            sendIntent.setType(contentTypeToUse);
-        } else {
-            sendIntent.setDataAndType(uriToShare, contentTypeToUse);
-        }
 
-        if (useChooser) {
-            sendIntent = Intent.createChooser(sendIntent, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        }
 
-        try {
-            context.startActivity(sendIntent);
-        } catch (ActivityNotFoundException e) {
-            Logger.logError(LOG_TAG, "No app handles the url " + data);
-        }
-    }
-
-    public static class ContentProvider extends android.content.ContentProvider {
-
-        private static final String LOG_TAG = "TermuxContentProvider";
-
-        @Override
-        public boolean onCreate() {
-            return true;
-        }
-
-        @Override
-        public Cursor query(@NonNull Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
-            File file = new File(uri.getPath());
-
-            if (projection == null) {
-                projection = new String[]{
-                    MediaStore.MediaColumns.DISPLAY_NAME,
-                    MediaStore.MediaColumns.SIZE,
-                    MediaStore.MediaColumns._ID
-                };
-            }
-
-            Object[] row = new Object[projection.length];
-            for (int i = 0; i < projection.length; i++) {
-                String column = projection[i];
-                Object value;
-                switch (column) {
-                    case MediaStore.MediaColumns.DISPLAY_NAME:
-                        value = file.getName();
-                        break;
-                    case MediaStore.MediaColumns.SIZE:
-                        value = (int) file.length();
-                        break;
-                    case MediaStore.MediaColumns._ID:
-                        value = 1;
-                        break;
-                    default:
-                        value = null;
-                }
-                row[i] = value;
-            }
-
-            MatrixCursor cursor = new MatrixCursor(projection);
-            cursor.addRow(row);
-            return cursor;
-        }
-
-        @Override
-        public String getType(@NonNull Uri uri) {
-            return null;
-        }
-
-        @Override
-        public Uri insert(@NonNull Uri uri, ContentValues values) {
-            return null;
-        }
-
-        @Override
-        public int delete(@NonNull Uri uri, String selection, String[] selectionArgs) {
-            return 0;
-        }
-
-        @Override
-        public int update(@NonNull Uri uri, ContentValues values, String selection, String[] selectionArgs) {
-            return 0;
-        }
-
-        @Override
-        public ParcelFileDescriptor openFile(@NonNull Uri uri, @NonNull String mode) throws FileNotFoundException {
-            File file = new File(uri.getPath());
-            try {
-                String path = file.getCanonicalPath();
-                String callingPackageName = getCallingPackage();
-                Logger.logDebug(LOG_TAG, "Open file request received from " + callingPackageName + " for \"" + path + "\" with mode \"" + mode + "\"");
-                String storagePath = Environment.getExternalStorageDirectory().getCanonicalPath();
-                // See https://support.google.com/faqs/answer/7496913:
-                if (!(path.startsWith(TermuxConstants.TERMUX_FILES_DIR_PATH) || path.startsWith(storagePath))) {
-                    throw new IllegalArgumentException("Invalid path: " + path);
-                }
-
-                // If TermuxConstants.PROP_ALLOW_EXTERNAL_APPS property to not set to "true", then throw exception
-                String errmsg = TermuxPluginUtils.checkIfAllowExternalAppsPolicyIsViolated(getContext(), LOG_TAG);
-                if (errmsg != null) {
-                    throw new IllegalArgumentException(errmsg);
-                }
-
-                // **DO NOT** allow these files to be modified by ContentProvider exposed to external
-                // apps, since they may silently modify the values for security properties like
-                // TermuxConstants.PROP_ALLOW_EXTERNAL_APPS set by users without their explicit consent.
-                if (TermuxConstants.TERMUX_PROPERTIES_FILE_PATHS_LIST.contains(path) ||
-                    TermuxConstants.TERMUX_FLOAT_PROPERTIES_FILE_PATHS_LIST.contains(path)) {
-                    mode = "r";
-                }
-
-            } catch (IOException e) {
-                throw new IllegalArgumentException(e);
-            }
-
-            return ParcelFileDescriptor.open(file, ParcelFileDescriptor.parseMode(mode));
-        }
-    }
-
-}
+                          
